@@ -17,6 +17,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // (Κριτικές Google: προς το παρόν χειροκίνητα στατικά νούμερα.
   //  Έτοιμο endpoint /api/reviews στον server.js για μελλοντική ενεργοποίηση.)
 
+  // «Επιστροφή στην αρχή» / brand -> αξιόπιστο smooth scroll στην κορυφή
+  document.querySelectorAll('a[href="#top"]').forEach((link) => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      history.replaceState(null, "", location.pathname + location.search);
+    });
+  });
+
   const form = document.getElementById("contact-form");
   if (!form) return;
 
