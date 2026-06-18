@@ -14,6 +14,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
+  // (Κριτικές Google: προς το παρόν χειροκίνητα στατικά νούμερα.
+  //  Έτοιμο endpoint /api/reviews στον server.js για μελλοντική ενεργοποίηση.)
+
   const form = document.getElementById("contact-form");
   if (!form) return;
 

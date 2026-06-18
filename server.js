@@ -22,13 +22,53 @@ const ROOT = __dirname;
 // Διάβασμα secrets: πρώτα env, μετά secrets.local.json
 let TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 let CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+let GOOGLE_KEY = process.env.GOOGLE_PLACES_API_KEY;
+let PLACE_ID = process.env.GOOGLE_PLACE_ID;
 try {
-  if (!TOKEN || !CHAT_ID) {
-    const s = JSON.parse(fs.readFileSync(path.join(ROOT, "secrets.local.json"), "utf8"));
-    TOKEN = TOKEN || s.TELEGRAM_BOT_TOKEN;
-    CHAT_ID = CHAT_ID || s.TELEGRAM_CHAT_ID;
-  }
+  const s = JSON.parse(fs.readFileSync(path.join(ROOT, "secrets.local.json"), "utf8"));
+  TOKEN = TOKEN || s.TELEGRAM_BOT_TOKEN;
+  CHAT_ID = CHAT_ID || s.TELEGRAM_CHAT_ID;
+  GOOGLE_KEY = GOOGLE_KEY || s.GOOGLE_PLACES_API_KEY;
+  PLACE_ID = PLACE_ID || s.GOOGLE_PLACE_ID;
 } catch (_) {}
+
+// Cache για τις κριτικές Google (ώστε να μη χτυπάμε το API σε κάθε επίσκεψη)
+const REVIEWS_TTL_MS = 12 * 60 * 60 * 1000; // 12 ώρες
+let reviewsCache = { at: 0, data: null };
+
+async function getGoogleReviews() {
+  if (reviewsCache.data && Date.now() - reviewsCache.at < REVIEWS_TTL_MS) {
+    return reviewsCache.data;
+  }
+  if (!GOOGLE_KEY || !PLACE_ID) {
+    throw new Error("Λείπει GOOGLE_PLACES_API_KEY ή GOOGLE_PLACE_ID στο secrets.local.json");
+  }
+  const url =
+    "https://maps.googleapis.com/maps/api/place/details/json" +
+    "?place_id=" + encodeURIComponent(PLACE_ID) +
+    "&fields=rating,user_ratings_total,reviews" +
+    "&reviews_sort=newest&language=el&key=" + encodeURIComponent(GOOGLE_KEY);
+
+  const r = await fetch(url);
+  const j = await r.json();
+  if (j.status !== "OK") {
+    throw new Error("Google Places: " + j.status + (j.error_message ? " — " + j.error_message : ""));
+  }
+  const res = j.result || {};
+  const data = {
+    rating: res.rating ?? null,
+    total: res.user_ratings_total ?? null,
+    reviews: (res.reviews || []).map((rv) => ({
+      author: rv.author_name,
+      rating: rv.rating,
+      text: rv.text,
+      time: rv.relative_time_description,
+      profile_photo: rv.profile_photo_url,
+    })),
+  };
+  reviewsCache = { at: Date.now(), data };
+  return data;
+}
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -102,6 +142,23 @@ const server = http.createServer((req, res) => {
         return sendJSON(res, 500, { error: "Server error." });
       }
     });
+    return;
+  }
+
+  // ---- API: Google reviews (cached) ----
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/reviews") {
+    getGoogleReviews()
+      .then((data) => {
+        res.writeHead(200, {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
+        });
+        res.end(JSON.stringify(data));
+      })
+      .catch((e) => {
+        console.error("reviews:", e.message);
+        sendJSON(res, 502, { error: "Δεν ήταν δυνατή η ανάκτηση κριτικών." });
+      });
     return;
   }
 
