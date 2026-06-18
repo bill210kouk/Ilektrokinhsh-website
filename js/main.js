@@ -26,6 +26,28 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Μπάρα προόδου scroll στην κορυφή
+  const progressEl = document.getElementById("scrollProgress");
+  if (progressEl) {
+    let ticking = false;
+    const updateProgress = () => {
+      const doc = document.documentElement;
+      const max = doc.scrollHeight - doc.clientHeight;
+      const pct = max > 0 ? (doc.scrollTop / max) * 100 : 0;
+      progressEl.style.width = pct + "%";
+      ticking = false;
+    };
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(updateProgress);
+        ticking = true;
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    updateProgress();
+  }
+
   const form = document.getElementById("contact-form");
   if (!form) return;
 
