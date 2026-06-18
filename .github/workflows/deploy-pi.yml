@@ -1,0 +1,44 @@
+name: Sync to Pi
+
+# Runs whenever commits land on main (i.e. a PR is merged or a direct push),
+# and can also be triggered manually from the Actions tab.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two syncs run at once; keep only the latest.
+concurrency:
+  group: sync-pi
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    # Runs on the self-hosted runner registered on the Pi (labels set at registration).
+    runs-on: [self-hosted, pi]
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      - name: Sync working copy to the Pi
+        run: |
+          set -euo pipefail
+          TARGET="/home/vaskouk/Ilektrokinhsh-website"
+          mkdir -p "$TARGET"
+          # Mirror the checked-out tree into the target, deleting removed files,
+          # but never touch the target's own .git directory.
+          rsync -a --delete \
+            --exclude='.git/' \
+            "$GITHUB_WORKSPACE"/ "$TARGET"/
+          echo "Synced $GITHUB_SHA to $TARGET"
+
+      # --- Optional: publish the static site to nginx's web root ---
+      # Uncomment and adjust if you want main to go live on the Pi automatically.
+      # - name: Deploy static site to nginx
+      #   run: |
+      #     set -euo pipefail
+      #     sudo rsync -a --delete \
+      #       --exclude='.git/' --exclude='.github/' \
+      #       "$GITHUB_WORKSPACE"/ /var/www/ilektrokinhsh/
+      #     sudo systemctl reload nginx
