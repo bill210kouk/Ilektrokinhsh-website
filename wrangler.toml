@@ -6,3 +6,10 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = "."
 binding = "ASSETS"
+
+# Rate limiting: max 5 αιτήματα ανά IP ανά 60s στο /api/send.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 5, period = 60 }
